@@ -1,0 +1,251 @@
+Thanks for sharing the full requirements for the **Kustomize Capstone Project**. Based on this document, here's a **complete implementation plan** with exact steps and deliverables aligned with each task:
+
+---
+
+## **Capstone Implementation Plan: "Implementing a Multi-Environment Application Deployment with Kustomize"**
+
+---
+
+### **Task 1: Set Up Your Project**
+
+* **Command:**
+
+  ```bash
+  mkdir -p kustomize-capstone/base
+  mkdir -p kustomize-capstone/overlays/{dev,staging,prod}
+  cd kustomize-capstone
+  ```
+
+---
+
+### **Task 2: Initialize Git**
+
+* **Command:**
+
+  ```bash
+  git init
+  echo ".DS_Store\n*.log\n*.env\n__pycache__/" > .gitignore
+  git add .
+  git commit -m "Initial commit with project structure"
+  ```
+
+---
+
+### **Task 3: Define Base Configuration**
+
+* **Files in `base/`:**
+
+  * `deployment.yaml`
+  * `service.yaml`
+  * `kustomization.yaml`
+
+**Example `deployment.yaml`:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-app
+  template:
+    metadata:
+      labels:
+        app: web-app
+    spec:
+      containers:
+        - name: web-app
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secret
+```
+
+**Example `kustomization.yaml`:**
+
+```yaml
+resources:
+  - deployment.yaml
+  - service.yaml
+
+configMapGenerator:
+  - name: app-config
+    literals:
+      - ENVIRONMENT=default
+      - APP_NAME=kustom-app
+
+secretGenerator:
+  - name: app-secret
+    literals:
+      - DB_USER=admin
+      - DB_PASS=defaultpass
+generatorOptions:
+  disableNameSuffixHash: true
+```
+
+---
+
+### **Task 4: Create Environment-Specific Overlays**
+
+* Each `overlays/dev`, `overlays/staging`, and `overlays/prod` contains:
+
+  * `kustomization.yaml`
+  * `patch-replicas.yaml` (or any other env-specific patches)
+
+**Example for `overlays/prod/kustomization.yaml`:**
+
+```yaml
+bases:
+  - ../../base
+
+namePrefix: prod-
+
+patchesStrategicMerge:
+  - patch-replicas.yaml
+
+commonLabels:
+  environment: production
+```
+
+**Example `patch-replicas.yaml`:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app
+spec:
+  replicas: 4
+```
+
+---
+
+### **Task 5: Integrate with a CI/CD Pipeline (GitHub Actions)**
+
+* Create a workflow file: `.github/workflows/deploy.yml`
+
+**Example:**
+
+```yaml
+name: Kustomize CI/CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Set up Kustomize
+        run: |
+          curl -s https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Deploy with Kustomize
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+        run: |
+          kubectl apply -k overlays/prod
+```
+
+---
+
+### **Task 6: Test the CI/CD Pipeline**
+
+* Modify anything in overlays or base.
+* Push to `main` branch.
+* Watch deployment in GitHub Actions + Kubernetes.
+
+---
+
+### **Task 7: Manage Secrets and ConfigMaps**
+
+Already implemented via:
+
+```yaml
+configMapGenerator:
+  - name: app-config
+    literals:
+      - ENVIRONMENT=default
+
+secretGenerator:
+  - name: app-secret
+    literals:
+      - DB_USER=admin
+      - DB_PASS=secret123
+generatorOptions:
+  disableNameSuffixHash: true
+```
+
+* Apply using:
+
+  ```bash
+  kubectl apply -k overlays/dev
+  ```
+
+---
+
+### **Task 8: Document Your Work (README.md)**
+
+Include:
+
+* Project structure
+* Kustomize basics
+* Deployment steps
+* CI/CD explanation
+* Screenshots (GitHub Actions, AWS Console)
+* Challenges and solutions
+
+---
+
+### **Task 9: Use Transformers and Generators (Advanced)**
+
+Add a `commonLabelsTransformer.yaml` to inject labels:
+
+```yaml
+apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: notImportantHere
+labels:
+  managed-by: kustomize
+fieldSpecs:
+  - path: metadata/labels
+    create: true
+```
+
+Include in `kustomization.yaml`:
+
+```yaml
+transformers:
+  - commonLabelsTransformer.yaml
+```
+
+---
+
+### **Final Deliverables:**
+
+1. **GitHub repo link** (with all code, `.github/workflows`, overlays, base)
+2. **README.md** (complete documentation)
+3. **Brief report** (summarize strategy, challenges, resolutions)
+
+---
+
+Would you like a pre-built GitHub repo or ZIP file for the above, so you can customize and submit?
